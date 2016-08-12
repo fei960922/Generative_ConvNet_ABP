@@ -6,7 +6,7 @@ color = 0;
 
 for i = 1:size(syn_mat, 4)
    % syn_mat(:,:,:,i) = uint8(syn_mat(:,:,:,i));
-   % syn_mat(:,:,:,i) = single(syn_mat(:,:,:,i)); % in yang's version, dont have this line
+    syn_mat(:,:,:,i) = single(syn_mat(:,:,:,i)); % in yang's version, dont have this line
     gLow = min( reshape(syn_mat(:,:,:,i), [],1));
     gHigh = max(reshape(syn_mat(:,:,:,i), [],1));
     syn_mat(:,:,:,i) = (syn_mat(:,:,:,i)-gLow) / (gHigh - gLow);

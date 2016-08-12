@@ -1,6 +1,6 @@
 clear all;
 
-category = 'teapot';
+category = 'face';
 [net, config] = nfa_config(category);
 %construct the generator network
 

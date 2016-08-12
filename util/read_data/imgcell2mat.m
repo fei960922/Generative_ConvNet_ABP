@@ -11,8 +11,5 @@ else
     img_mat = zeros([sz, numImages], 'single');
 end
 for i = 1:numImages
-    %if size(img_cell{i}, 3) == 3
-    %  img_mat(:,:,:,end+1) = img_cell{i};
-    %end
-    img_mat(:,:,:,i) = img_cell{i};
+   img_mat(:,:,:,i) = img_cell{i};
 end

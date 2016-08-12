@@ -1,6 +1,6 @@
 function [ net, config ] = nfa_sound_config(category )
 
-config.gpus = 1;
+config.gpus = [];
 % config file for the model and training algorithm
 config.categoryName = category;
 % 3rd parth package, i.e., matconvnet

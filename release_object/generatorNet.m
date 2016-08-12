@@ -3,11 +3,11 @@ function net = generatorNet( net, config )
 % the input to the network should be 1*100*1*nsamp
 %% fc layer 
 opts.weightDecay = 1 ;
-opts.scale = 2 ; %to ensure 0.02 std 0.07
+opts.scale = 2 ;
 opts.weightInitMethod = 'gaussian' ;
 opts.batchNormalization = false;
 opts.addrelu = false;
-opts.leak = 0.2;
+opts.leak = 0.0;
 layer_name = '1';
 num_in = 1;
 num_out = 64*8*4*4;
@@ -20,14 +20,14 @@ net = add_cnn_block(net, opts, layer_name, filter_h, filter_w, num_in, num_out, 
 %% Reshape layer (reshape to 4*4*512*nsamp)+ batchnorm + relu
 net = addCustomReshapeLayer(net, @reshapeForward, @reshapeBackward);
 num_out = 512;
-%net.layers{end+1} = struct('type', 'bnorm', 'name', sprintf('bn%d',layer_name), ...
-%        'weights', {{ones(num_out, 1, 'single'), zeros(num_out, 1, 'single')}}, ...
-%        'learningRate', 1*[2 1], ...
-%        'weightDecay', [0 0]) ;
+net.layers{end+1} = struct('type', 'bnorm', 'name', sprintf('bn%d',layer_name), ...
+        'weights', {{ones(num_out, 1, 'single'), zeros(num_out, 1, 'single')}}, ...
+        'learningRate', 1*[2 1], ...
+        'weightDecay', [0 0]) ;
 
 net.layers{end+1} = struct('type', 'relu', 'leak', opts.leak, 'name', sprintf('relu%s',layer_name));
 %% first deconv layer output shape: 8*8*256*nsamp 
-opts.batchNormalization = false; % true
+opts.batchNormalization = true;
 opts.addrelu = true;
 layer_name = '2';
 num_in = 64*8;

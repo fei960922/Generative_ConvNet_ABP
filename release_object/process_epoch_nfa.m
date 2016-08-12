@@ -10,13 +10,11 @@ net = vl_simplenn_move(net_cpu, 'gpu') ;
 training = learningRate > 0 ;
 if training, mode = 'training' ; else, mode = 'validation' ; end
 %if nargout > 2, mpiprofile on ; end
+mmap= [];
 
 
-%dydz_syn = gpuArray(zeros(config.dydz_sz, 'single'));
-%ydz_syn(net.filterSelected) = net.selectedLambdas;
-%dydz_syn = repmat(dydz_syn, 1, 1, 1, config.nTileRow*config.nTileCol);
-loss = 0; % used for the reconstruction error SSD
 for t=1:opts.batchSize:numel(subset)
+    %fprintf('batch_size %02d', opts.batchSize);
     fprintf('%s: epoch %02d: batch %3d/%3d: ', mode, epoch, ...
         fix(t/opts.batchSize)+1, ceil(numel(subset)/opts.batchSize)) ;
     batchSize = min(opts.batchSize, numel(subset) - t + 1) ;
@@ -27,11 +25,22 @@ for t=1:opts.batchSize:numel(subset)
 %     stats = [] ;
     %   error = [] ;
     
-        
-        batchStart = t ;
+    for s = 1:opts.numSubBatches    
+        batchStart = t + (labindex-1) + (s-1) *numlabs;
         batchEnd = min(t+opts.batchSize-1, numel(subset)) ;
-        batch = subset(batchStart :  batchEnd) ;
+        batch = subset(batchStart : opts.numSubBatches*numlabs:  batchEnd) ;
+        
         im = getBatch(imdb, batch) ;
+        if opts.prefetch
+            if s==opts.numSubBatches
+                batchStart = t + (labindex-1) + opts.batchSize ;
+                batchEnd = min(t+2*opts.batchSize-1, numel(subset)) ;
+            else
+                batchStart = batchStart + numlabs ;
+            end
+            nextBatch = subset(batchStart : opts.numSubBatches * numlabs : batchEnd) ;
+            getBatch(imdb, nextBatch) ;
+        end
         
         if numGpus >= 1
             im = gpuArray(im) ;
@@ -39,20 +48,24 @@ for t=1:opts.batchSize:numel(subset)
         
         % training images
         %numImages = size(im, 4);
-        cell_idx = (ceil(t / opts.batchSize));
+        cell_idx = (ceil(t / opts.batchSize) -1)*numlabs + labindex;
+        fprintf('numlabs %2d, labindex %2d', numlabs, labindex);
         syn_mat = gpuArray(syn_mats{cell_idx});
         if isempty(syn_mat)
            %syn_mat = gpuArray(config.refsig*randn([1, config.z_dim, 1, size(im, 4)], 'single')); 
            syn_mat = gpuArray(config.refsig*zeros([1,config.z_dim,1, size(im, 4)], 'single'));
         end
         switch config.alg_type
+            % for now, only focus on langevin sampling
             case 'alter_grad'
-                syn_mat = alternate_gradient_z(config, net, im, syn_mat);       
-                syn_mats{cell_idx} = syn_mat;      
-                syn_mat = gpuArray(syn_mat);
-                fz = vl_simplenn(net, syn_mat);
-                dydz = im - fz(end).x;
-                res = vl_simplenn(net, gpuArray(syn_mat), gpuArray(dydz), res, 'conserveMemory', 1, 'cudnn', 1);
+                [syn_mat] = alternate_gradient_z(config, net, im, syn_mat);       
+                syn_mats{cell_idx} = gather(syn_mat);      
+                res = vl_nfa(net, syn_mat, im, res, ...
+                    'conserveMemory', 1, ...
+                    'cudnn', 1);
+                %fz = vl_simplenn(net, syn_mat, [], []);
+                %dydz = im - fz(end).x;
+                %res = vl_simplenn(net, gpuArray(syn_mat), gpuArray(dydz), res, 'conserveMemory', 1, 'cudnn', 1);
                 
             case 'joint_grad'
                 net = vl_simplenn_move(net, 'gpu');
@@ -67,26 +80,36 @@ for t=1:opts.batchSize:numel(subset)
                
                 
             case 'langevin_sampling'
-                [syn_mat]= langevin_dynamic_z(config, net, im, syn_mat);       
-                syn_mats{cell_idx} = gather(syn_mat);      
-               % syn_mat_g = gpuArray(syn_mat);
-                fz = vl_simplenn(net, syn_mat, [], []);
-                dydz = im - fz(end).x;
-                res = vl_simplenn(net, syn_mat, gpuArray(dydz), res, 'conserveMemory', 1, 'cudnn', 1);
-               
+                
+                [syn_mat]= langevin_dynamic_z(config, net, im, syn_mat); 
+      
+                
+                syn_mats{cell_idx} = gather(syn_mat);
+                
+                res = vl_nfa(net, syn_mat, im, res, ...
+                    'conserveMemory', 1, ...
+                    'cudnn', 1);
+ 
         end
                 
         numDone = numDone + numel(batch) ;
-        
+    end
 
     % gather and accumulate gradients across labs
     if training
         if numGpus <= 1
             [net] = accumulate_gradients(opts, learningRate, batchSize, net, res, config);
-             %[net] = accumulate_gradients_adam(opts, learningRate, batchSize, net, res, config, epoch);
+             
         else
-            fprintf('Not implement the multi-GPU version yet');
-                    
+            %fprintf('Not implement the multi-GPU version yet');
+            if isempty(mmap)
+                mmap = map_gradients(opts.memoryMapFile, net, res, numGpus) ;
+            end
+            
+            write_gradients(mmap, net, res) ;
+            labBarrier() ;
+            net = accumulate_gradients(opts, learningRate, batchSize, net, res, config, mmap) ;
+               
         end
     end
     
@@ -107,7 +130,7 @@ end
 
 
 % -------------------------------------------------------------------------
-function [net] = accumulate_gradients(opts, lr, batchSize, net, res, config)
+function [net] = accumulate_gradients(opts, lr, batchSize, net, res, config, mmap)
 % -------------------------------------------------------------------------
 %layer_sets = config.layer_sets;
 % if nargin < 8
@@ -122,8 +145,17 @@ for l = numel(net.layers):-1:1
         thisDecay = opts.weightDecay * net.layers{l}.weightDecay(j) ;
         thisLR = lr * net.layers{l}.learningRate(j) ;
         
+        
+        
         % accumualte from multiple labs (GPUs) if needed
-       
+        if nargin >= 7
+            tag = sprintf('l%d_%d',l,j) ;
+            tmp = zeros(size(mmap.Data(labindex).(tag)), 'single') ;
+            for g = setdiff(1:numel(mmap.Data), labindex)
+                tmp = tmp + mmap.Data(g).(tag) ;
+            end
+            res(l).dzdw{j} = res(l).dzdw{j} + tmp;
+        end
         
         if isfield(net.layers{l}, 'weights')
             %gradient_dzdw_cell = [];
@@ -160,90 +192,36 @@ for l = numel(net.layers):-1:1
 end
 end
 
-
+function mmap = map_gradients(fname, net, res, numGpus)
 % -------------------------------------------------------------------------
-function [net] = accumulate_gradients_adam(opts, lr, batchSize, net, res, config, epoch)
-% -------------------------------------------------------------------------
-%layer_sets = config.layer_sets;
-% if nargin < 8
-%     layer_sets = numel(net.layers):-1:numel(net.layers)-2;
-% end
+format = {} ;
+for i=1:numel(net.layers)
+    for j=1:numel(res(i).dzdw)
+        format(end+1,1:3) = {'single', size(res(i).dzdw{j}), sprintf('l%d_%d',i,j)} ;
+    end
+end
 
-
-for l = numel(net.layers):-1:1
-    for j=1:numel(res(l).dzdw)
-        thisDecay = opts.weightDecay * net.layers{l}.weightDecay(j) ;
-        thisLR = lr * net.layers{l}.learningRate(j) ;
-        lr_t = lr * sqrt(1.0 - (config.beta2)^epoch) / (1.0 - (config.beta1)^epoch);
-        
-        % accumualte from multiple labs (GPUs) if needed
-       
-        
-        if isfield(net.layers{l}, 'weights')
-            %gradient_dzdw_cell = [];
-            %gradient_dzdw_sum = zeros(size(res_syn_ref(l).dzdw{j}));
-            %for iImg = 1:num_img
-                %res_syn = res_syncell{iImg};
-            %    gradient_dzdw_cell{iImg} = (1/num_syn) * (1/config.s / config.s)* res_syn(l).dzdw{j};
-            %    gradient_dzdw_sum =gradient_dzdw_sum + gradient_dzdw_cell{iImg};
-            %end
-            gradient_dzdw = -(1/batchSize)* (1 / config.s / config.s)* res(l).dzdw{j};
-            gradient_dzdw2 = gradient_dzdw.^2;
-            
-            net.layers{l}.avg_first{j} = config.beta1 * net.layers{l}.avg_first{j} ...
-                +(1 - config.beta1) * gradient_dzdw;
-            net.layers{l}.avg_second{j} = config.beta2 * net.layers{l}.avg_second{j} ...
-                +(1 - config.beta2) * gradient_dzdw2;
-            
-            net.layers{l}.weights{j} = net.layers{l}.weights{j} ...
-                - lr_t * net.layers{l}.avg_first{j}./(sqrt(net.layers{l}.avg_second{j}) + config.eps);
-  
-            %       net.layers{l}.weights{j} = net.layers{l}.weights{j} + thisLR * gradient_dzdw;
-            if j == 1
-                %res_l = min(l+2, length(res));
-                %fprintf('\n layer %s:max response is %f, min response is %f.\n', net.layers{l}.name, max(res(res_l).x(:)), min(res(res_l).x(:)));
-                fprintf('max gradient is %f, min gradient is %f, learning rate is %f\n', max(gradient_dzdw(:)), min(gradient_dzdw(:)), lr_t);
-                                
-            end % j==1
+format(end+1,1:3) = {'double', [3 1], 'errors'} ;
+if ~exist(fname, 'file') && (labindex == 1)
+    f = fopen(fname,'wb') ;
+    for g=1:numGpus
+        for i=1:size(format,1)
+            fwrite(f,zeros(format{i,2},format{i,1}),format{i,1}) ;
         end
     end
+    fclose(f) ;
 end
+labBarrier() ;
+mmap = memmapfile(fname, 'Format', format, 'Repeat', numGpus, 'Writable', true) ;
 end
 
-
-
-function net = accumulate_bias(net, res, config, mmap)
-layer_sets = config.layer_sets;
-% if nargin < 8
-%     layer_sets = numel(net.layers):-1:numel(net.layers)-2;
-% endwrite_bias
-
-for l = layer_sets
-    % accumualte from multiple labs (GPUs) if needed
-    res_l = [];
-    if nargin >= 4
-        tag = sprintf('l%d',l) ;
-        for g = setdiff(1:numel(mmap.Data), labindex)
-            res_l = cat(4, res_l, mmap.Data(g).(tag));
-        end
-    end
-    
-    if isfield(net.layers{l}, 'weights') ...
-            && strcmp(net.layers{l}.name(1:2), 'fc') == 0
-        
-        res_l = cat(4, res_l, res(l+1).x);
-        sz = size(res_l);
-        res_l = reshape(reshape(res_l, [], sz(4))', [], sz(3));
-        bias = single(prctile(res_l, 100-config.sparse_level(l)));
-        net.layers{l}.weights{2} = net.layers{l}.weights{2} - bias;
+function write_gradients(mmap, net, res)
+% -------------------------------------------------------------------------
+for i=1:numel(net.layers)
+    for j=1:numel(res(i).dzdw)
+        mmap.Data(labindex).(sprintf('l%d_%d',i,j)) = gather(res(i).dzdw{j}) ;
     end
 end
 end
 
 
-
-
-
-
-
- 

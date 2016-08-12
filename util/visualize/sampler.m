@@ -15,7 +15,7 @@ draw_figures(config, syn_mat, iter);
 
 if iter == config.nIteration && config.is_texture == false
     % we draw the interpolation result
-    Z = zeros(1, 1, config.z_dim, config.interp_dim*config.interp_dim, 'single');
+    Z = zeros(1, config.z_dim, 1, config.interp_dim*config.interp_dim, 'single');
     z1 = linspace(-2, 2, config.interp_dim);
     z2 = linspace(-2, 2, config.interp_dim);
     [X,Y] = meshgrid(z1,z2);

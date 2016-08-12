@@ -16,7 +16,7 @@ config.Fs = Fs;
 
 %train the model
 learningTime = tic;
-net = train_model_audio_nfa(config, net, audiodb, getBatch);
+%net = train_model_audio_nfa(config, net, audiodb, getBatch);
 
 learningTime = toc(learningTime);
 hrs = floor(learningTime / 3600);
