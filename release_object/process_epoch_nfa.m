@@ -46,14 +46,14 @@ for t=1:opts.batchSize:numel(subset)
             im = gpuArray(im) ;
         end
         
-        % training images
+        % training imagessyn_mats
         %numImages = size(im, 4);
         cell_idx = (ceil(t / opts.batchSize) -1)*numlabs + labindex;
         fprintf('numlabs %2d, labindex %2d', numlabs, labindex);
         syn_mat = gpuArray(syn_mats{cell_idx});
         if isempty(syn_mat)
-           %syn_mat = gpuArray(config.refsig*randn([1, config.z_dim, 1, size(im, 4)], 'single')); 
-           syn_mat = gpuArray(config.refsig*zeros([1,config.z_dim,1, size(im, 4)], 'single'));
+           syn_mat = gpuArray(config.refsig*randn([1, config.z_dim, 1, size(im, 4)], 'single')); 
+           %syn_mat = gpuArray(config.refsig*zeros([1,config.z_dim,1, size(im, 4)], 'single'));
         end
         switch config.alg_type
             % for now, only focus on langevin sampling

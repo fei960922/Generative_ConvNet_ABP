@@ -1,6 +1,6 @@
 clear all;
 % text texture network
-category = 'rose';
+category = 'water5';
 [net, config] = nfa_texture_config(category);
 %construct the generator network
 net = textureGeneratorNet224(net, config);

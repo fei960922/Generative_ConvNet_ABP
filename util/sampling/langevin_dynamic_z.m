@@ -11,7 +11,9 @@ for t = 1:config.Lstep
     syn_mat = syn_mat + config.Delta * config.Delta /2 /config.s /config.s* res(1).dzdx ...
            - config.Delta * config.Delta /2 /config.refsig /config.refsig* syn_mat;
     % langevin noise
-    syn_mat = syn_mat + config.Delta * gpuArray(randn(size(syn_mat), 'single'));          
+    if ~(isfield(config, 'no_noise_in_langevin')) || ~config.no_noise_in_langevin
+        syn_mat = syn_mat + config.Delta * gpuArray(randn(size(syn_mat), 'single'));        
+    end
 end
 end
 

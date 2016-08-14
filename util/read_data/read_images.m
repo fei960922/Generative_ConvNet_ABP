@@ -1,12 +1,19 @@
-function [imgCell, im_ori] = read_images(config, net)
+function imgCell = read_images(config, net)
 
 img_file = [config.working_folder, 'images.mat'];
-files = read_image_recursive(config.inPath);
-if isfield(config,'max_img') && length(files)>config.max_img
+if isfield(config, 'recursive') && config.recursive
+    files = read_image_recursive(config.inPath)
+else
+    files = dir(config.inPath);
+    files = files(3:length(files))
+    for i=1:length(files)
+        files(i).name = [config.inPath '/' files(i).name];
+    end
+end
+if isfield(config, 'max_img') && length(files)>config.max_img
     files = files(1:config.max_img);
 end
 
-im_ori = [];
 numImages = 0;
 
 if exist(img_file, 'file')
@@ -14,11 +21,11 @@ if exist(img_file, 'file')
     numImages = length(imgCell);
 end
 
-if numImages ~= length(files) || config.forceLearn == true
+if numImages ~= length(files) || config.forceLearn == true;
     imgCell = cell(1, length(files));
     for iImg = 1:length(files)
         
-        img = single(imread(fullfile(files(iImg).name)));
+        img = single(imread(files(iImg).name));
        
         if config.is_crop == true
             h = round((size(img, 1) - config.cropped_sz)/2);
@@ -28,7 +35,6 @@ if numImages ~= length(files) || config.forceLearn == true
             cropped_img = img(h:h+config.cropped_sz-1, w:w+config.cropped_sz-1, :);
           
             img = cropped_img;
-            
             img = imresize(img, [config.sx,config.sy]);
         elseif config.is_preprocess == true
             % do rescaling 
@@ -53,6 +59,7 @@ if numImages ~= length(files) || config.forceLearn == true
         
         imgCell{iImg} = 2*(img - min(img(:)))/(max(img(:))-min(img(:)))-1 ;
     end
+    save(img_file, 'imgCell');
 end
 end
 
@@ -62,10 +69,10 @@ function files = read_image_recursive(path)
     for i=1:length(list)
         item = list(i);
         if (item.isdir==1) & ~strcmp(item.name,'.') & ~strcmp(item.name,'..')
-            files = [files;read_image_recursive([path item.name])]
+            files = [files;read_image_recursive([path '/' item.name])];
         else
             if (strfind(item.name,'.jpg'))
-                item.name = [path item.name];
+                item.name = [path '/' item.name];
                 files = [files;item];
             end
         end

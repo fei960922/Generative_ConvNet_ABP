@@ -1,4 +1,12 @@
-function [ net, config ] = nfa_config(category, pathss, extern)
+clear all;
+
+category = 'train_0801_bed_l_0.00005_80_fc=3_step=0.2';
+pathss = '/media/vclagpu/Data2/yanglu/data/lsun/bedroom_train_lmdb/images/0';
+
+config.fc_number=3;
+config.recursive = true;
+config.max_img = 100000;
+config.zsyn = randn(1, 80, 1, 81, 'single');
 
 config.gpus = 2;
 % config file for the model and training algorithm
@@ -10,35 +18,7 @@ run(fullfile(config.matconvv_path, 'matlab', 'vl_setupnn.m'));
 config.model_path = '../model/';
 
 %lcation of input dataset
-if extern
-    config.inPath = pathss;
-else
-    config.inPath = ['/media/vclagpu/Data1/JerryXu/Code/ABP/Image/', config.categoryName];
-end
-
-%location of the result
-config.Synfolder = ['./synthesiedImage/',config.categoryName, '/'];
-config.working_folder = ['./working/', config.categoryName, '/'];
-config.figure_folder = ['./figure/', config.categoryName,  '/'];
-if ~exist('./synthesiedImage/', 'dir')
-   mkdir('./synthesiedImage/') 
-end
-if ~exist('./working/', 'dir')
-    mkdir('./working/')
-end
-if ~exist('./figure/', 'dir')
-   mkdir('./figure/') 
-end
-if ~exist(config.Synfolder, 'dir')
-   mkdir(config.Synfolder);
-end
-if ~exist(config.working_folder, 'dir')
-    mkdir(config.working_folder);
-end
-if ~exist(config.figure_folder, 'dir')
-    mkdir(config.figure_folder);
-end
-if extern
+config.inPath = pathss;
     if ~exist('/media/vclagpu/Data1/JerryXu/nfa', 'dir')
         mkdir('/media/vclagpu/Data1/JerryXu/nfa')
     end
@@ -46,18 +26,23 @@ if extern
     config.figure_folder = ['/media/vclagpu/Data1/JerryXu/nfa/', config.categoryName, '/'];
     config.Synfolder = ['/media/vclagpu/Data1/JerryXu/nfa/', config.categoryName, '/'];
     if ~exist(config.Synfolder, 'dir')
-        mkdir(config.Synfolder)
+       mkdir(config.Synfolder);
     end
-end
+    if ~exist(config.working_folder, 'dir')
+        mkdir(config.working_folder);
+    end
+    if ~exist(config.figure_folder, 'dir')
+        mkdir(config.figure_folder);
+    end
 
 
 config.forceLearn = true;
-config.z_dim = 10;
+config.z_dim = 80;
 %parameter of the input (the ouput of the generator net is 64*64*3, so
 %retrict the input to be 64*64
 config.sx = 64;
 config.sy = 64;
-config.BatchSize = 32; % each batch size is the z_dim * (images for such dim)
+config.BatchSize = 128; % each batch size is the z_dim * (images for such dim)
 config.z_dim_batch = config.BatchSize / config.z_dim; % for each dimension, batch size is 5
 
 %parameter for the size of the output of the generator network
@@ -72,7 +57,7 @@ config.Lstep = 30; % step of langevin sampling
 config.nTileRow = 9; %9
 config.nTileCol = 9; % nTileRow*nTileCol is the # of samples we only visulize
 %config.nsample = 1; % the number of samples
-config.Delta = 0.3; % stepsize
+config.Delta = 0.2; % stepsize
 
 % parameter for alternate gradient 
 config.alt_lambda = 0.125; % the stepsize for the gradient evalution of z
@@ -81,8 +66,8 @@ config.alt_lambda = 0.125; % the stepsize for the gradient evalution of z
 config.joint_lambda = 0.05; % the stepsize for the gradient evaluation of z
 
 %parameter for SGD learning
-config.nIteration = 600;
-config.Gamma = 0.0001; % 0.0005 for egret
+config.nIteration = 100;
+config.Gamma = 0.00005; % 0.0005 for egret
 
 % parameter for Adam learning
 config.beta1 = 0.5;
@@ -107,7 +92,7 @@ config.interval_exp = 0.99;
 
 % next, set up the algorithm type: alternative gradient (alter_grad), joint gradient (joint_grad),
 % or Langevin sampling (langevin_sampling)
-config.alg_type = 'joint_grad';
+config.alg_type = 'langevin_sampling';
 
 % parameter for interpolation purpose 
 config.interp_type = 'both';
@@ -120,12 +105,31 @@ config.cropped_sz = 108;
 
 % preprocss for lsun-bed, cropped patch is 64*64
 config.rescale_sz = 96; % the smallest dimension is 96
-config.is_preprocess = false;
+config.is_preprocess = true;
 
 % Config of output
-config.outputStep = 50;
+config.outputStep = 1;
 
 net = [];
 net.layers = {};
-end
+%construct the generator network
 
+net = generatorNet(net, config);
+%x = randn(1, 1, 2, 3, 'single');
+%read image imdb
+imgCell = read_images(config, net);
+disp('Read Finished');
+[imdb, getBatch] = convert2imdb(imgcell2mat(imgCell));
+disp('!');
+%train the model
+learningTime = tic;
+[net, syn_mats] = train_model_nfa(config, net, imdb, getBatch, 0.2);
+
+learningTime = toc(learningTime);
+hrs = floor(learningTime / 3600);
+learningTime = mod(learningTime, 3600);
+mins = floor(learningTime / 60);
+secds = mod(learningTime, 60);
+fprintf('total learning time is %d hours / %d minutes / %.2f seconds.\n', hrs, mins, secds);
+
+interpolator(config, net, syn_mats);

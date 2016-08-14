@@ -1,4 +1,4 @@
-function [net, syn_mats] = train_model_nfa(config, net, imdb, getBatch)
+function [net, syn_mats] = train_model_nfa(config, net, imdb, getBatch, momentum)
 % train non-linear factor analysis model
 % the input net is a cpu version.
 opts.batchSize = config.BatchSize ;
@@ -16,7 +16,7 @@ opts.prefetch = false;
 opts.numFetchThreads = 8;
 opts.cudnn = true ;
 opts.weightDecay = 0.0001 ; %0.0001
-opts.momentum = 0.5 ;
+opts.momentum = momentum ;
 
 opts.plotDiagnostics = false ;
 opts.memoryMapFile = fullfile(config.working_folder, 'matconvnet.bin') ;
@@ -67,7 +67,6 @@ if numGpus > 1
 elseif numGpus == 1
  % gpuDevice(opts.gpus)
 end
-
 if exist(opts.memoryMapFile), delete(opts.memoryMapFile) ; end
 % Here, only consider the single gpu cases. So don't consider the num_syn
 % for now
@@ -84,7 +83,7 @@ syn_mats = cell(1, num_syns);
 % -------------------------------------------------------------------------
 %                                                        Train and validate
 % -------------------------------------------------------------------------
-z = config.refsig*randn(1, config.z_dim,1, config.nTileRow*config.nTileCol, 'single'); % tian change
+%z = config.refsig*randn(1, config.z_dim,1, config.nTileRow*config.nTileCol, 'single'); % tian change
 
 SSD = zeros(config.nIteration, 1);
 learningRate0 = config.Gamma;
@@ -93,7 +92,8 @@ for epoch=1:opts.numEpochs
     
     %learningRate =  config.Gamma;
     %learningRate = config.lr0_rms;
-    learningRate = learningRate0 / (1. + epoch / config.interval);
+    learningRate = learningRate0 * config.interval_exp^epoch;
+    %learningRate = learningRate0 / (1. + epoch / config.interval);
     %learningRate = learningRate0 * 10^(-epoch / config.interval);
     fprintf('learning_rate %2d\n', learningRate);
     % train one epoch and validate
@@ -122,17 +122,13 @@ for epoch=1:opts.numEpochs
         clear tmp;
     end
     SSD(epoch) = loss;
-    if mod(epoch - 1, 20) == 0 || epoch == opts.numEpochs
+    if mod(epoch - 1, config.outputStep) == 0 || epoch == opts.numEpochs
         %idx_syn = randi(num_syns, 1);
         %syn_mat = syn_mats(:,:,:,:, 1);
-         
-        syn_mat_samp = sampler(opts, config, net, epoch, z);        
-        
-        if mod(epoch, inf) == 0 || epoch == opts.numEpochs
-            model_file = [config.working_folder, 'iter_',...
-                num2str(epoch) ,'_model.mat'];
-            save(model_file, 'net', 'syn_mat_samp');
-        end
+        syn_mat_samp = sampler(opts, config, net, epoch, syn_mats{1}, 'reconstruction');
+        syn_mat_samp = sampler(opts, config, net, epoch, config.zsyn, 'synthesis');
+        model_file = [config.working_folder, 'model.mat'];
+        save(model_file, 'net', 'syn_mat_samp', 'syn_mats', 'config');
     end
     fprintf('iteration %d, reconstruction error %f \n', epoch, SSD(epoch));  
 end % epoch
@@ -171,7 +167,7 @@ for t=1:opts.batchSize:numel(subset)
             'backPropDepth', opts.backPropDepth, ...
             'sync', opts.sync, ...
             'cudnn', opts.cudnn) ;
-        loss = loss + gather( mean(reshape(sqrt((res(end).x - im).^2), [], 1)) / size(im.4));
+        loss = loss + gather( mean(reshape(sqrt((res(end).x - im).^2), [], 1)) / size(im,4));
     end
 end
 end

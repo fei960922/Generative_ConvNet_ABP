@@ -10,14 +10,20 @@ opts.addrelu = false;
 opts.leak = 0.0;
 learning_rate = 0.9;
 if (~isfield(config, 'fc_number') || config.fc_number==1) 
-    net = add_cnn_block(net, opts, '1', 1, config.z_dim, 1, 64*8*4*4, 1, 0, learning_rate);
+	net = add_cnn_block(net, opts, '1', 1, config.z_dim, 1, 64*8*4*4, 1, 0, learning_rate);
 else 
     if (config.fc_number==2)
-    %% fc-1 layer 
-    net = add_cnn_block(net, opts, '1', 1, config.z_dim, 1, 64*8, 1, 0, learning_rate);
-    %% fc-2 layer
-    net = add_cnn_block(net, opts, '2', 1, 1, 64*8, 64*8*4*4, 1, 0, learning_rate);
-end
+	%% fc-1 layer 
+	net = add_cnn_block(net, opts, '1', 1, config.z_dim, 1, 64*8, 1, 0, learning_rate);
+	%% fc-2 layer
+	net = add_cnn_block(net, opts, '2', 1, 1, 64*8, 64*8*4*4, 1, 0, learning_rate);
+    else
+        if (config.fc_number==3)
+            net = add_cnn_block(net, opts, '1', 1, config.z_dim, 1, 64*8, 1, 0, learning_rate);
+	        net = add_cnn_block(net, opts, '2', 1, 1, 32, 64*8, 1, 0, learning_rate);
+	        net = add_cnn_block(net, opts, '3', 1, 1, 64*8, 64*8*4*4, 1, 0, learning_rate);
+        end
+    end
 end
 %% Reshape layer (reshape to 4*4*512*nsamp)+ batchnorm + relu
 net = addCustomReshapeLayer(net, @reshapeForward, @reshapeBackward);

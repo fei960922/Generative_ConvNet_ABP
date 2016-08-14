@@ -58,7 +58,7 @@ config.nTileCol = 4; % nTileRow*nTileCol is the # of samples we only visulize
 config.Delta = 0.3; % stepsize
 
 %parameter for SGD learning
-config.nIteration = 600;
+config.nIteration = 10;
 config.Gamma = 0.0001; % 0.0005 for egret
 
 config.is_texture = true;
@@ -69,5 +69,7 @@ config.vis_dim_z = config.z_dim*2 ;
 config.alg_type = 'langevin_sampling';
 net = [];
 net.layers = {};
+
+config.is_crop = false;
 end
 

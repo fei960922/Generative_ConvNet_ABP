@@ -1,6 +1,6 @@
 function [ net, config ] = nfa_sound_config(category )
 
-config.gpus = [];
+config.gpus = 1;
 % config file for the model and training algorithm
 config.categoryName = category;
 % 3rd parth package, i.e., matconvnet
@@ -44,14 +44,14 @@ config.sy = 60000;
 config.BatchSize = 64; % only used for batching training, but is =1
 
 %parameter for the size of the output of the generator network
-config.gensz = [1, 60000, 1];
+config.gensz = [1, config.sy, 1];
 
 %parameter for the reference gaussian model
 config.refsig = 1;
 %parameter for the noise of the factor analysis
 config.s = 0.3;
 %parameter for langevin sampling
-config.Lstep = 10; % step of langevin sampling
+config.Lstep = 30; % step of langevin sampling
 config.nTileRow = 3;
 config.nTileCol = 1; % nTileRow*nTileCol is the # of samples we only visulize
 %config.nsample = 1; % the number of samples
@@ -59,7 +59,7 @@ config.Delta = 0.1; % stepsize
 
 %parameter for SGD learning
 config.nIteration = 600;
-config.Gamma = 0.0001; % 0.0005 for egret
+config.Gamma = 0.0005; % 0.0005 for egret
 
 config.is_texture = false;
 config.extend_factor = 1;

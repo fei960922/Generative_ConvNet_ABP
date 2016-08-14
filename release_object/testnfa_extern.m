@@ -1,5 +1,15 @@
-function [ net, config ] = nfa_config(category, pathss, extern)
+function [net, syn_mats] = testnfa_extern()
 
+    clear all;
+
+    category = 'cat/langevin_no_noise_step=0.01';
+    pathss = '/media/vclagpu/Data1/JerryXu/Code/ABP/Image/cat';
+
+    config.fc_number=2;
+    config.add_conv_behind=false;
+    config.no_noise_in_langevin = true;
+    
+    
 config.gpus = 2;
 % config file for the model and training algorithm
 config.categoryName = category;
@@ -8,37 +18,7 @@ config.matconvv_path = '../matconvnet-1.0-beta16/';
 run(fullfile(config.matconvv_path, 'matlab', 'vl_setupnn.m'));
 %location of the deep model
 config.model_path = '../model/';
-
-%lcation of input dataset
-if extern
-    config.inPath = pathss;
-else
-    config.inPath = ['/media/vclagpu/Data1/JerryXu/Code/ABP/Image/', config.categoryName];
-end
-
-%location of the result
-config.Synfolder = ['./synthesiedImage/',config.categoryName, '/'];
-config.working_folder = ['./working/', config.categoryName, '/'];
-config.figure_folder = ['./figure/', config.categoryName,  '/'];
-if ~exist('./synthesiedImage/', 'dir')
-   mkdir('./synthesiedImage/') 
-end
-if ~exist('./working/', 'dir')
-    mkdir('./working/')
-end
-if ~exist('./figure/', 'dir')
-   mkdir('./figure/') 
-end
-if ~exist(config.Synfolder, 'dir')
-   mkdir(config.Synfolder);
-end
-if ~exist(config.working_folder, 'dir')
-    mkdir(config.working_folder);
-end
-if ~exist(config.figure_folder, 'dir')
-    mkdir(config.figure_folder);
-end
-if extern
+config.inPath = pathss;
     if ~exist('/media/vclagpu/Data1/JerryXu/nfa', 'dir')
         mkdir('/media/vclagpu/Data1/JerryXu/nfa')
     end
@@ -48,9 +28,6 @@ if extern
     if ~exist(config.Synfolder, 'dir')
         mkdir(config.Synfolder)
     end
-end
-
-
 config.forceLearn = true;
 config.z_dim = 10;
 %parameter of the input (the ouput of the generator net is 64*64*3, so
@@ -72,7 +49,7 @@ config.Lstep = 30; % step of langevin sampling
 config.nTileRow = 9; %9
 config.nTileCol = 9; % nTileRow*nTileCol is the # of samples we only visulize
 %config.nsample = 1; % the number of samples
-config.Delta = 0.3; % stepsize
+config.Delta = 0.01; % stepsize
 
 % parameter for alternate gradient 
 config.alt_lambda = 0.125; % the stepsize for the gradient evalution of z
@@ -103,11 +80,10 @@ config.vis_dim_y = config.sy;
 %config.vis_dim_z = config.z_dim;
 % parameter for learning rate annealing (linear or exponential)
 config.interval = 300;  
-config.interval_exp = 0.99;
 
 % next, set up the algorithm type: alternative gradient (alter_grad), joint gradient (joint_grad),
 % or Langevin sampling (langevin_sampling)
-config.alg_type = 'joint_grad';
+config.alg_type = 'langevin_sampling';
 
 % parameter for interpolation purpose 
 config.interp_type = 'both';
@@ -127,5 +103,26 @@ config.outputStep = 50;
 
 net = [];
 net.layers = {};
-end
 
+    %construct the generator network
+
+    net = generatorNet_new(net, config);
+    config.zsyn = randn(1, config.z_dim, 1, config.nTileRow*config.nTileCol, 'single');
+    %read image imdb
+    imgCell = read_images(config, net);
+    disp('Read Finished');
+    [imdb, getBatch] = convert2imdb(imgcell2mat(imgCell));
+    disp('!');
+    %train the model
+    learningTime = tic;
+    [net, syn_mats] = train_model_nfa(config, net, imdb, getBatch, 0.5);
+
+    learningTime = toc(learningTime);
+    hrs = floor(learningTime / 3600);
+    learningTime = mod(learningTime, 3600);
+    mins = floor(learningTime / 60);
+    secds = mod(learningTime, 60);
+    fprintf('total learning time is %d hours / %d minutes / %.2f seconds.\n', hrs, mins, secds);
+
+    interpolator(config, net, syn_mats);
+end

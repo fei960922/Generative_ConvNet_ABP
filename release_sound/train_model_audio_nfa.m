@@ -78,7 +78,8 @@ syn_mats = cell(1, num_syns);
 % -------------------------------------------------------------------------
 %                                                        Train and validate
 % -------------------------------------------------------------------------
-z = randn(1,config.vis_dim_z, 1, config.nTileRow*config.nTileCol, 'single');
+
+z = randn(1, config.vis_dim_z, 1, config.nTileRow*config.nTileCol, 'single');
 SSD = zeros(config.nIteration, 1);
 for epoch=1:opts.numEpochs
     fprintf('iteration %d / %d\n', epoch, opts.numEpochs);
@@ -108,7 +109,7 @@ for epoch=1:opts.numEpochs
        % clear tmp;
     end
     SSD(epoch) = loss;
-    if mod(epoch - 1, 40) == 0 || epoch == opts.numEpochs
+    if mod(epoch - 1, 100) == 0 || epoch == opts.numEpochs
         %idx_syn = randi(num_syns, 1);
         %syn_mat = syn_mats(:,:,:,:, 1);
          

@@ -1,24 +1,33 @@
-clear all;
+function [net, syn_mats] = testnfa()
 
-category = 'face';
-[net, config] = nfa_config(category);
-%construct the generator network
+    clear all;
 
-net = generatorNet(net, config);
-%x = randn(1, 1, 2, 3, 'single');
-%read image imdb
-imgCell = read_images(config, net);
-[imdb, getBatch] = convert2imdb(imgcell2mat(imgCell));
+    category = 'test_0814_bed_s_joint_gd';
+    pathss = '/media/vclagpu/Data1/JerryXu/Code/ABP/Image/cat';
 
-%train the model
-learningTime = tic;
-[net, syn_mats] = train_model_nfa(config, net, imdb, getBatch);
+    [net, config] = nfa_config(category, pathss, true);
+    config.fc_number=3;
+    config.add_conv_behind=false;
+    
+    %construct the generator network
 
-learningTime = toc(learningTime);
-hrs = floor(learningTime / 3600);
-learningTime = mod(learningTime, 3600);
-mins = floor(learningTime / 60);
-secds = mod(learningTime, 60);
-fprintf('total learning time is %d hours / %d minutes / %.2f seconds.\n', hrs, mins, secds);
+    net = generatorNet_new(net, config);
+    config.zsyn = randn(1, config.z_dim, 1, config.nTileRow*config.nTileCol, 'single');
+    %read image imdb
+    imgCell = read_images(config, net);
+    disp('Read Finished');
+    [imdb, getBatch] = convert2imdb(imgcell2mat(imgCell));
+    disp('!');
+    %train the model
+    learningTime = tic;
+    [net, syn_mats] = train_model_nfa(config, net, imdb, getBatch, 0.3);
 
-interpolator(config, net, syn_mats);
+    learningTime = toc(learningTime);
+    hrs = floor(learningTime / 3600);
+    learningTime = mod(learningTime, 3600);
+    mins = floor(learningTime / 60);
+    secds = mod(learningTime, 60);
+    fprintf('total learning time is %d hours / %d minutes / %.2f seconds.\n', hrs, mins, secds);
+
+    interpolator(config, net, syn_mats);
+end

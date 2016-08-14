@@ -1,4 +1,4 @@
-function [] = draw_figures(config, syn_mat, iter)
+function [] = draw_figures(config, syn_mat, iter, name)
 
 [I_syn, syn_mat_norm] = convert_syns_mat(config, syn_mat);
 for i = 1:size(syn_mat_norm, 4)
@@ -13,5 +13,5 @@ else
     imwrite(imind, cm, [config.Synfolder, 'animation', '.gif'], 'WriteMode', 'append', 'DelayTime', 0.10);
 end
 
-imwrite(I_syn,[config.Synfolder,  num2str(iter, 'dense_original_%04d'), '.png']);
+imwrite(I_syn,[config.Synfolder, name, num2str(iter, '_%04d'), '.png']);
 end
