@@ -6,7 +6,7 @@ function [SSD, im_output] = evaluation(config, net)
     
     main_path = 'C:\Users\fei96\Documents\MATLAB\CSST\ABP\';
     opts.cudnn = false;
-    %config.Delta = 0.03;
+    config.Delta = 0.05;
     config.max_img = 10;
     
     for i=1:length(net.layers)
@@ -23,7 +23,7 @@ function [SSD, im_output] = evaluation(config, net)
 
 %% Image input
     
-    config.inPath = [main_path 'Image\dog\'];
+    config.inPath = [main_path 'Image\face_eva\'];
     imgCell= read_images(config, net);
     [im, getBatch] = convert2imdb(imgcell2mat(imgCell));
     im = im.images.data;

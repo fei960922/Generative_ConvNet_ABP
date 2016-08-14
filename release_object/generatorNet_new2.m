@@ -20,14 +20,24 @@ net.layers{end+1} = struct('type', 'bnorm', 'name', sprintf('bn%d','1'), ...
         'weightDecay', [0 0]) ;
 net.layers{end+1} = struct('type', 'relu', 'leak', opts.leak, 'name', sprintf('relu%s','1'));
 %% first deconv layer output shape: 8*8*256*nsamp 
+
+opts.batchNormalization = false;
+opts.addrelu = false;
+net = add_deconv_block(net, opts, '2', 5, 5, 64*8, 64*4, 3, [1,2,1,2], learning_rate);
 opts.batchNormalization = true;
 opts.addrelu = true;
-
-net = add_deconv_block(net, opts, '2', 5, 5, 64*8, 64*4, 3, [1,2,1,2], learning_rate);
 net = add_cnn_block(net, opts, '2c', 2, 2, 64*4, 64*4, 1, 0, learning_rate);
+opts.batchNormalization = false;
+opts.addrelu = false;
 net = add_deconv_block(net, opts, '3', 5, 5, 64*4, 64*2, 2, [1,2,1,2], learning_rate);
+opts.batchNormalization = true;
+opts.addrelu = true;
 net = add_cnn_block(net, opts, '3c', 3, 3, 64*2, 64*2, 1, 0, learning_rate);
+opts.batchNormalization = false;
+opts.addrelu = false;
 net = add_deconv_block(net, opts, '4', 5, 5, 64*2, 64*1, 2, [1,2,1,2], learning_rate);
+opts.batchNormalization = true;
+opts.addrelu = true;
 net = add_cnn_block(net, opts, '4c', 4, 4, 64*1, 64*1, 1, 0, learning_rate);
 opts.batchNormalization = false;
 opts.addrelu = false;
