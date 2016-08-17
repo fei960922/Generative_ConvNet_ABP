@@ -1,12 +1,13 @@
-function [re_train, re_test, im_output] = evaluation(config, net, catagory)
+function [re_train, re_test, im_train, im_test] = evaluation(config, net, catagory)
 
 %% Init
+    Delta = 0.05;
     
     if nargin<2, load(config);end
     
     main_path = 'C:\Users\fei96\Documents\MATLAB\CSST\ABP\';
     opts.cudnn = false;
-    config.Delta = 0.05;
+    config.Delta = Delta;
     config.max_img = 10;
     
     for i=1:length(net.layers)
@@ -34,24 +35,24 @@ function [re_train, re_test, im_output] = evaluation(config, net, catagory)
     tic;
     res = [];
     SSD = [];
-    for t = 1:30
+    config.Delta = Delta;
+    for t = 1:50
         res = vl_nfa(net, syn_mat, im, res, 'conserveMemory', 1);
         syn_mat = syn_mat + config.Delta * config.Delta /2 /config.s /config.s* res(1).dzdx ...
                - config.Delta * config.Delta /2 /config.refsig /config.refsig* syn_mat;
         syn_mat = syn_mat + config.Delta * randn(size(syn_mat), 'single');          
-    if mod(t,5)==0
-        fz = vl_simplenn(net, syn_mat, [], [], 'accumulate', false, 'disableDropout', true);
-        fz = fz(end).x;
-        config.nTileRow = 3;
-        config.nTileCol = 3;
-        [I_syn, syn_mat_norm] = convert_syns_mat(config, fz);
-        SSD(t) = computer_error(im, fz);
-        fprintf('Reconstruction Error in %d step (Delta=%f): %f\n', t, config.Delta, SSD(t));
-        config.Delta = config.Delta / 1.01;
-        im_output = I_syn;
+        if mod(t,1)==0
+            fz = vl_simplenn(net, syn_mat, [], [], 'accumulate', false, 'disableDropout', true);
+            fz = fz(end).x;
+            config.nTileRow = 3;
+            config.nTileCol = 3;
+            [I_syn, syn_mat_norm] = convert_syns_mat(config, fz);
+            SSD(t) = computer_error(im, fz);
+            fprintf('Reconstruction Error in %d step (Delta=%f): %f\n', t, config.Delta, SSD(t));
+            config.Delta = config.Delta / 1.01;
+            im_train = I_syn;
+        end
     end
-    end
-    imshow(I_syn);
     re_train = SSD;
     toc;
 
@@ -68,24 +69,23 @@ function [re_train, re_test, im_output] = evaluation(config, net, catagory)
     tic;
     res = [];
     SSD = [];
-    for t = 1:30
+    for t = 1:50
         res = vl_nfa(net, syn_mat, im, res, 'conserveMemory', 1);
         syn_mat = syn_mat + config.Delta * config.Delta /2 /config.s /config.s* res(1).dzdx ...
                - config.Delta * config.Delta /2 /config.refsig /config.refsig* syn_mat;
         syn_mat = syn_mat + config.Delta * randn(size(syn_mat), 'single');          
-    if mod(t,5)==0
-        fz = vl_simplenn(net, syn_mat, [], [], 'accumulate', false, 'disableDropout', true);
-        fz = fz(end).x;
-        config.nTileRow = 3;
-        config.nTileCol = 3;
-        [I_syn, syn_mat_norm] = convert_syns_mat(config, fz);
-        SSD(t) = computer_error(im, fz);
-        fprintf('Reconstruction Error in %d step (Delta=%f): %f\n', t, config.Delta, SSD(t));
-        config.Delta = config.Delta / 1.01;
-        im_output = I_syn;
+        if mod(t,1)==0
+            fz = vl_simplenn(net, syn_mat, [], [], 'accumulate', false, 'disableDropout', true);
+            fz = fz(end).x;
+            config.nTileRow = 3;
+            config.nTileCol = 3;
+            [I_syn, syn_mat_norm] = convert_syns_mat(config, fz);
+            SSD(t) = computer_error(im, fz);
+            fprintf('Reconstruction Error in %d step (Delta=%f): %f\n', t, config.Delta, SSD(t));
+            config.Delta = config.Delta / 1.01;
+            im_test = I_syn;
+        end
     end
-    end
-    imshow(I_syn);
     re_test = SSD;
     toc;
     

@@ -2,10 +2,10 @@ function imgCell = read_images(config, net)
 
 img_file = [config.working_folder, 'images.mat'];
 if isfield(config, 'recursive') && config.recursive
-    files = read_image_recursive(config.inPath)
+    files = read_image_recursive(config.inPath);
 else
     files = dir(config.inPath);
-    files = files(3:length(files))
+    files = files(3:length(files));
     for i=1:length(files)
         files(i).name = [config.inPath '/' files(i).name];
     end
@@ -16,16 +16,15 @@ end
 
 numImages = 0;
 
-if exist(img_file, 'file')
-    load(img_file);
-    numImages = length(imgCell);
-end
-
 if numImages ~= length(files) || config.forceLearn == true;
     imgCell = cell(1, length(files));
     for iImg = 1:length(files)
         
         img = single(imread(files(iImg).name));
+        
+        if size(img,1)>1000
+            img = imresize(img, [178, 218]);
+        end
        
         if config.is_crop == true
             h = round((size(img, 1) - config.cropped_sz)/2);
@@ -59,7 +58,7 @@ if numImages ~= length(files) || config.forceLearn == true;
         
         imgCell{iImg} = 2*(img - min(img(:)))/(max(img(:))-min(img(:)))-1 ;
     end
-    save(img_file, 'imgCell');
+    %save(img_file, 'imgCell');
 end
 end
 

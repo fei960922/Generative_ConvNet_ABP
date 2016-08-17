@@ -19,9 +19,9 @@ else
 	net = add_cnn_block(net, opts, '2', 1, 1, 64*8, 64*8*4*4, 1, 0, learning_rate);
     else
         if (config.fc_number==3)
-            net = add_cnn_block(net, opts, '1', 1, config.z_dim, 1, 64*8, 1, 0, learning_rate);
-	        net = add_cnn_block(net, opts, '2', 1, 1, 32, 64*8, 1, 0, learning_rate);
-	        net = add_cnn_block(net, opts, '3', 1, 1, 64*8, 64*8*4*4, 1, 0, learning_rate);
+            net = add_cnn_block(net, opts, '1', 1, config.z_dim, 1, 64*4, 1, 0, learning_rate);
+	        net = add_cnn_block(net, opts, '2', 1, 1, 64*4, 64*16, 1, 0, learning_rate);
+	        net = add_cnn_block(net, opts, '3', 1, 1, 64*16, 64*8*4*4, 1, 0, learning_rate);
         end
     end
 end

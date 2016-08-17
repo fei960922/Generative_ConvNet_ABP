@@ -25,7 +25,7 @@ opts.memoryMapFile = fullfile(config.working_folder, 'matconvnet.bin') ;
 if isempty(opts.train), opts.train = find(imdb.images.set==1) ; end
 if isempty(opts.val), opts.val = find(imdb.images.set==2) ; end
 if isnan(opts.train), opts.train = [] ; end
-
+ 
 opts.batchSize = min(opts.batchSize, numel(opts.train));
 opts.numEpochs = config.nIteration;
 
