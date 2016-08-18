@@ -1,7 +1,7 @@
 function [re_train, re_test, im_train, im_test] = evaluation(config, net, catagory)
 
 %% Init
-    Delta = 0.05;
+    Delta = 0.1;
     
     if nargin<2, load(config);end
     
@@ -36,7 +36,7 @@ function [re_train, re_test, im_train, im_test] = evaluation(config, net, catago
     res = [];
     SSD = [];
     config.Delta = Delta;
-    for t = 1:50
+    for t = 1:150
         res = vl_nfa(net, syn_mat, im, res, 'conserveMemory', 1);
         syn_mat = syn_mat + config.Delta * config.Delta /2 /config.s /config.s* res(1).dzdx ...
                - config.Delta * config.Delta /2 /config.refsig /config.refsig* syn_mat;
