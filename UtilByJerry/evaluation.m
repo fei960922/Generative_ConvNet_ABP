@@ -1,14 +1,14 @@
 function [re_train, re_test, im_train, im_test] = evaluation(config, net, catagory)
 
 %% Init
-    Delta = 0.1;
+    Delta = 0.05;
     
     if nargin<2, load(config);end
     
     main_path = 'C:\Users\fei96\Documents\MATLAB\CSST\ABP\';
     opts.cudnn = false;
     config.Delta = Delta;
-    config.max_img = 10;
+    config.max_img = 2;
     
     for i=1:length(net.layers)
         if strcmp(net.layers{i}.type,'custom')
@@ -36,7 +36,7 @@ function [re_train, re_test, im_train, im_test] = evaluation(config, net, catago
     res = [];
     SSD = [];
     config.Delta = Delta;
-    for t = 1:150
+    for t = 1:50
         res = vl_nfa(net, syn_mat, im, res, 'conserveMemory', 1);
         syn_mat = syn_mat + config.Delta * config.Delta /2 /config.s /config.s* res(1).dzdx ...
                - config.Delta * config.Delta /2 /config.refsig /config.refsig* syn_mat;
@@ -93,11 +93,11 @@ function [re_train, re_test, im_train, im_test] = evaluation(config, net, catago
 %%
 
     function res_ = rforward(layer, res, res_)
-        res_.x = reshapeForward(res.x);
+        res_.x = reshapeForward_big(res.x);
     end
 
     function res = rbackward(layer, res, res_)
-        res.dzdx = reshapeBackward(res.x, res_.dzdx);
+        res.dzdx = reshapeBackward_big(res.x, res_.dzdx);
     end
     
     function res_ = tforward(layer, res, res_)
